@@ -52,6 +52,7 @@ class Movie(models.Model):
 
 class Episode(models.Model):
     """Episode of a show"""
+
     show = models.ForeignKey(
         'Show',
         on_delete=models.CASCADE,
