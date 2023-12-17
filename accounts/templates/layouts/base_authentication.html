@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% load i18n static %}
+
+{% block style %}
+<link rel="stylesheet" href="{% static 'accounts/css/style.css' %}">
+{% endblock %}
+
+{% block main %}
+<section id="authentication" class="height-100 bg-dark">
+    <div class="container">
+      <div class="row justify-content-center">
+        <div class="col-lg-4 col-md-7">
+          <div class="card">
+            <div class="card-body">
+              <div class="row">
+                <div class="col-12">
+                  <form id="{% block form_id %}{% endblock %}" action="{% block form_method %}{% endblock %}" method="post" enctype="multipart/form-data">
+                    {% csrf_token %}
+
+                    {% for field, name in form.errors.items %}
+                      {{ field }} {{ name }}
+                    {% endfor %}
+
+                    {% block authentication_content %}{% endblock %}
+                  </form>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+{% endblock %}

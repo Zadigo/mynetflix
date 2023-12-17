@@ -1,0 +1,20 @@
+{% extends "layouts/base_authentication.html" %}
+{% load i18n static %}
+
+{% block title %}
+{% trans "Complete profile" %}
+{% endblock %}
+
+{% block form_id %}form-complete-profile{% endblock %}
+
+{% block form_method %}{% url 'accounts:complete_account_view' token=hashed_email %}{% endblock %}
+
+{% block authentication_content %}
+  <input id="firstname" name="firstname" placeholder="{% trans 'Firstname' %}" class="form-control p-2 mb-2" type="text" autocomplete="given-name" />
+  <input id="lastname" name="lastname" placeholder="{% trans 'Lastname' %}" class="form-control p-2 mb-2" type="text" autocomplete="family-name" class="my-2" />
+  <input id="enterprise" name="enterprise" placeholder="{% trans 'Entreprise' %}" class="form-control p-2" type="text" autocomplete="organization-title" class="my-2" />
+
+  <button id="cta-complete-information" type="submit" class="btn btn-lg btn-dark btn-block btn-rounded mt-5">
+      {% trans "Complete account" %}
+  </button>
+{% endblock %}
