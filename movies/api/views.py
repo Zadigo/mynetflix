@@ -2,11 +2,13 @@ import datetime
 import json
 import re
 from urllib.parse import urlencode
+from django.shortcuts import get_object_or_404
 
 import requests
 from movies import utils
 from django.core.files.base import ContentFile
 from rest_framework.response import Response
+from rest_framework.decorators import api_view
 from rest_framework.views import APIView
 
 from movies.api import serializers
@@ -59,29 +61,11 @@ class SearchMovieView(APIView):
                 lastname=lastname
             )
 
-            # Create the writers
-            # writers_objs = []
-            # writers = data['Writer'].split(',')
-            # for writer in writers:
-            #     firstname, lastname = writer.split(' ', maxsplit=1)
-            #     writer, _ = Writer.objects.get_or_create(
-            #         firstname=firstname,
-            #         lastname=lastname
-            #     )
-            #     writers_objs.append(writer)
-
             # Create the actors, the director and the
-            writers_objs = utils.create_from_comma_separated(data['Writer'], Writer)
-            actors_objs = utils.create_from_comma_separated(data['Actors'], Actor)
-            # actors = data['Actors'].split(',')
-            # actors_objs = []
-            # for actor in actors:
-            #     firstname, lastname = actor.strip().split(' ', maxsplit=1)
-            #     actor, _ = Actor.objects.get_or_create(
-            #         firstname=firstname,
-            #         lastname=lastname
-            #     )
-            #     actors_objs.append(actor)
+            writers_objs = utils.create_from_comma_separated(
+                data['Writer'], Writer)
+            actors_objs = utils.create_from_comma_separated(
+                data['Actors'], Actor)
 
             # Create the movie
             dvd_date = datetime.datetime.strptime(
@@ -131,7 +115,6 @@ class SearchMovieView(APIView):
                     if key == 'Source':
                         new_rating.update(source=value)
                 normalized_ratings.append(new_rating)
-            normalized_ratings = str(normalized_ratings)
 
             movie = Movie.objects.create(
                 title=data['Title'],
@@ -169,3 +152,10 @@ class SearchMovieView(APIView):
             response_serializer = MovieSerializer(instance=movie)
             return Response(response_serializer.data)
         return Response({})
+
+
+@api_view(http_method_names=['get'])
+def actor_details(request, actor_id, **kwargs):
+    actor = get_object_or_404(Actor, actor_id=actor_id)
+    serializer = serializers.ActorMovieSerializer(instance=actor)
+    return Response(data=serializer.data)

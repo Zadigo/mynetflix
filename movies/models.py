@@ -203,6 +203,22 @@ class Movie(models.Model):
         """Number of years since the movie was released"""
         return timezone.now().year - self.release_year
 
+    @cached_property
+    def global_score(self):
+        total_ratings = [
+            float(item['rating'])
+            for item in self.ratings
+        ]
+        total_ratings.append(self.metascore)
+        scale_ratings = [
+            rating / 10
+            for rating in total_ratings
+            if rating > 10
+        ]
+        total = sum(scale_ratings)
+        score = total / len(scale_ratings)
+        return score
+
 
 @receiver(pre_save, sender=Movie)
 def create_movie_slug(instance, **kwargs):

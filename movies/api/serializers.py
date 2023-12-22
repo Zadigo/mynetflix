@@ -14,6 +14,7 @@ class DirectorSerializer(Serializer):
     director_id = fields.CharField()
     firstname = fields.CharField()
     lastname = fields.CharField()
+    fullname = fields.CharField()
 
 
 class ActorSerializer(Serializer):
@@ -21,6 +22,7 @@ class ActorSerializer(Serializer):
     actor_id = fields.CharField()
     firstname = fields.CharField()
     lastname = fields.CharField()
+    fullname = fields.CharField()
 
 
 class WriterSerializer(Serializer):
@@ -28,6 +30,7 @@ class WriterSerializer(Serializer):
     writer_id = fields.CharField()
     firstname = fields.CharField()
     lastname = fields.CharField()
+    fullname = fields.CharField()
 
 
 class RatingSerializer(Serializer):
@@ -69,4 +72,20 @@ class MovieSerializer(Serializer):
     slug = fields.SlugField()
     modified_on = fields.DateTimeField()
     created_on = fields.DateTimeField()
-    # ratings = RatingSerializer(many=True)
+
+
+class MovieActorSerializer(Serializer):
+    id = fields.CharField()
+    movie_id = fields.CharField()
+    title = fields.CharField()
+    genre = CommaSeparatedField()
+    release_year = fields.IntegerField()
+
+
+class ActorMovieSerializer(Serializer):
+    id = fields.CharField()
+    actor_id = fields.CharField()
+    firstname = fields.CharField()
+    lastname = fields.CharField()
+    fullname = fields.CharField()
+    movie_set = MovieActorSerializer(many=True)

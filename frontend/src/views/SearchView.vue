@@ -1,9 +1,10 @@
 <template>
   <section id="search">
+    <v-progress-linear v-if="searching" indeterminate />
     <header id="movie-header" ref="header" class="px-4 py-5 mb-5 text-center shadow-sm">
       <!-- <h1 class="display-5 fw-bold text-body-emphasis">Centered hero</h1> -->
       <div class="col-lg-6 mx-auto">
-        <search-input id="search" @new-search="handleHeaderImage" />
+        <search-input id="search" @new-search="handleHeaderImage" @search-started="searching = true" @search-ended="searching = false" />
       </div>
       <!-- <div class="background-blur"></div>
       <div ref="header" class="background-image-wraper"></div> -->
@@ -13,26 +14,33 @@
       <!-- <span>{{ currentMovie }}</span> -->
       <div class="row">
         <div class="col-sm-12 col-md-12">
-          
+
           <div class="row mt-2">
             <div class="col-sm-12 col-md-8">
               <!-- Movie Information -->
               <div class="row">
                 <div class="col-sm-12 col-md-12">
-                  <v-card>
+                  <v-card :aria-label="currentMovie.title">
                     <v-card-item>
-                      <v-card-title><h1 class="text-uppercase">{{ currentMovie.Title }}</h1></v-card-title>
+                      <v-card-title>
+                        <h1 class="text-uppercase">{{ currentMovie.title }}</h1>
+                      </v-card-title>
                       <v-card-subtitle class="d-flex justify-content-start gap-2">
-                        <span class="fw-bold text-body-secondary">{{ currentMovie.Year }}</span>
-                        <span class="fw-light text-body-secondary">({{ currentMovie.Released }})</span>
-                        <span class="fw-light text-body-emphasis">{{ currentMovie.Genre }}</span>
+                        <!-- <span class="fw-bold text-body-secondary">{{ currentMovie.release_year }}</span> -->
+                        <span class="fw-light text-body-secondary">({{ currentMovie.release_year }})</span>
+
+                        <div id="genre">
+                          <span v-for="genre in currentMovie.genre" :key="genre" class="badge text-bg-secondary me-2 fw-light text-dark">
+                            {{ genre }}
+                          </span>
+                        </div>
                       </v-card-subtitle>
                     </v-card-item>
 
                     <v-card-text>
                       <v-card-actions>
                         <v-btn variant="tonal" class="mt-2">
-                          <font-awesome-icon :icon="['fas', 'bookmark']"></font-awesome-icon>
+                          <font-awesome-icon :icon="['fas', 'bookmark']" class="me-2"></font-awesome-icon>
                           Bookmark
                         </v-btn>
                       </v-card-actions>
@@ -43,26 +51,26 @@
 
               <div class="row mt-3">
                 <h2 class="h5">Cast</h2>
-                <div v-for="actor in actors" :key="actor" class="col-sm-12 col-md-3">
+                <div v-for="actor in currentMovie.actors" :key="actor.actor_id" class="col-sm-12 col-md-3">
                   <v-card>
                     <v-card-text>
-                      {{ actor }}
+                      {{ actor.firstname }} {{ actor.lastname }}
                     </v-card-text>
                   </v-card>
                 </div>
               </div>
-  
+
               <div class="row my-3">
                 <div class="col-sm-12 col-md-12">
                   <h2 class="h5">Plot</h2>
                   <v-card>
                     <v-card-text>
-                      <p>{{ currentMovie.Plot }}</p>
+                      <p>{{ currentMovie.plot }}</p>
                     </v-card-text>
                   </v-card>
                 </div>
               </div>
-              
+
               <!-- Ratings -->
               <div class="row">
                 <h2 class="h5">Ratings</h2>
@@ -71,29 +79,38 @@
                     <v-card-text>
                       <div class="d-flex justify-content-start gap-2">
                         <span class="fw-bold">IMDB</span>
-                        <span class="fw-light">{{ currentMovie.imdbRating }}</span>
+                        <span class="fw-light">{{ currentMovie.imdb_rating }}</span>
                       </div>
-                      <v-rating half-increments readonly :length="10" :size="20" :model-value="parseFloat(currentMovie.imdbRating)" active-color="primary" class="mt-2" />
+                      <!-- <v-rating half-increments readonly :length="10" :size="20" :model-value="currentMovie.imdb_rating" active-color="primary" class="mt-2" /> -->
+                      <v-rating v-model="currentMovie.imdb_rating" :length="10" :size="20" class="mt-2" height="15">
+                        <template v-slot:item="props">
+                          <v-icon :color="props.isFilled ? 'green' : 'grey-lighten-1'" size="large" @click="props.onClick">
+                            {{ props.isFilled ? 'mdi-star-circle' : 'mdi-star-circle-outline' }}
+                          </v-icon>
+                        </template>
+                      </v-rating>
                     </v-card-text>
                   </v-card>
 
-                  <v-card v-for="(rating, i) in currentMovie.Ratings" :key="i" class="mt-1">
+                  <!-- Ratings -->
+                  <rating-block :ratings="currentMovie.ratings" />
+                  <!-- <v-card v-for="(rating, i) in currentMovie.ratings" :key="i" class="mt-1">
                     <v-card-text>
                       <div class="d-flex justify-content-start gap-2">
                         <span class="fw-bold">{{ rating.Source }}</span>
                         <span class="fw-light">{{ rating.Value }}</span>
                       </div>
-                      <v-rating v-if="rating.Source === 'Internet Movie Database'" half-increments readonly :length="parseRating(rating.Value)[1]" :size="20" :model-value="parseRating(rating.Value)[0]" active-color="primary" class="mt-2" />
-                      <v-progress-linear v-if="rating.Source === 'Rotten Tomatoes' || rating.Source === 'Metacritic'" :model-value="rating.Value" class="mx-n5" color="yellow-darken-3" height="20" rounded></v-progress-linear>
+                      <v-rating v-if="rating.source === 'Internet Movie Database'" half-increments readonly :length="rating.rating" :size="20" :model-value="rating.rating" active-color="primary" class="mt-2" />
+                      <v-progress-linear v-if="rating.source === 'Rotten Tomatoes' || rating.source === 'Metacritic'" :model-value="rating.rating" class="mx-n5" color="yellow-darken-3" height="20" rounded></v-progress-linear>
                     </v-card-text>
-                  </v-card>
+                  </v-card> -->
                 </div>
               </div>
             </div>
-          
+
             <div class="col-sm-12 col-md-4">
               <v-card>
-                <v-img :src="currentMovie.Poster" aspect-ratio="1/1" />
+                <v-img :src="currentMovie.poster_url" aspect-ratio="1/1" />
               </v-card>
             </div>
           </div>
@@ -104,13 +121,16 @@
 </template>
 
 <script>
+import { ref } from 'vue'
 import { useMovies } from '@/store/movies'
 import { storeToRefs } from 'pinia'
+import RatingBlock from '@/components/RatingBlock.vue'
 import SearchInput from '@/components/SearchInput.vue'
 
 export default {
   name: 'SearchView',
   components: {
+    RatingBlock,
     SearchInput
   },
   beforeRouteEnter (from, to, next) {
@@ -123,8 +143,10 @@ export default {
   setup () {
     const store = useMovies()
     const { currentMovie } = storeToRefs(store)
+    const searching = ref(false)
     return {
       store,
+      searching,
       currentMovie
     }
   },
@@ -179,6 +201,7 @@ export default {
   top: 0;
   left: 0;
 }
+
 .background-image-wraper {
   position: absolute;
   top: 0;

@@ -1,7 +1,7 @@
 <template>
   <div class="search-wrapper">
     <div class="d-flex justify-content-around align-items-center gap-2">
-      <v-text-field v-model="requestParams.t" variant="solo" placeholder="Search movie name, actors..." hide-details @keypress.enter="handleSearch" />
+      <v-text-field v-model="requestParams.title" variant="solo" placeholder="Search movie name, actors..." hide-details @keypress.enter="handleSearch" />
       <v-btn color="primary" size="x-large" :disabled="cannotSearch" @click="handleSearch">
         Search
       </v-btn>
@@ -32,6 +32,12 @@ export default {
   emits: {
     'new-search' () {
       return true
+    },
+    'search-started' () {
+      return true
+    },
+    'search-ended' () {
+      return true
     }
   },
   setup () {
@@ -39,13 +45,13 @@ export default {
     const { currentMovie } = storeToRefs(store)
     const requestParams = ref({
       // API key
-      apikey: 'b7e2e7b5',
+      // apikey: 'b7e2e7b5',
       // Movie title
-      t: null,
+      title: null,
       // Year
-      y: null,
+      release_year: null,
       // Response type
-      r: 'json'
+      movie_type: 'movie'
     })
     return {
       currentMovie,
@@ -56,7 +62,7 @@ export default {
     cannotSearch () {
       // When the user has entered no text value to search, disables
       // any element that needs to be disabled
-      return this.requestParams.t === null || this.requestParams.t === ''
+      return this.requestParams.title === null || this.requestParams.title === ''
     },
     previousSearch () {
       // Return the six previous searched values
@@ -70,7 +76,9 @@ export default {
     async handleSearch () {
       // Handle the request to the OMDB api
       try {
-        const response = await this.$omdb.get('/', { params: this.requestParams })
+        this.$emit('search-started', true)
+        // const response = await this.$omdb.get('/', { params: this.requestParams })
+        const response = await this.$http.post('movies/search', this.requestParams)
         this.currentMovie = response.data
         this.$session.create('currentMovie', this.currentMovie)
         
@@ -82,7 +90,8 @@ export default {
         if (response.data?.Title) {
           this.$session.defaultList('movies', response.data)
         }
-
+        
+        this.$emit('search-ended', true)
         this.$emit('new-search')
       } catch (e) {
         console.log(e)
