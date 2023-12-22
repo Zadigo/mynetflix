@@ -29,6 +29,7 @@ INSTALLED_APPS = [
     'django_extensions',
     'rest_framework.authtoken',
     'shows',
+    'movies',
     'accounts',
 ]
 

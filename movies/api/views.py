@@ -1,86 +1,137 @@
 import datetime
+import json
 import re
 from urllib.parse import urlencode
 
 import requests
-from django.core.files import File
+from movies import utils
+from django.core.files.base import ContentFile
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from movies.api import serializers
-from movies.api.serializers import MovieSerializer
+from movies.api.serializers import MovieSearchForm, MovieSerializer
 from movies.models import Actor, Director, Movie, Writer
 
 
 class SearchMovieView(APIView):
     http_method_names = ['post']
-    api_url = 'http://www.omdbapi.com/?type=movie&r=json&t=it'
+    api_url = 'http://www.omdbapi.com'
+    serializer_class = serializers.MovieSearchForm
 
     def post(self, request, **kwargs):
-        serializer = serializers.MovieSearchForm(request.data)
+        # serializer = serializers.MovieSearchForm(request.data)
+        # serializer.is_valid(raise_exception=True)
+
+        serializer = self.serializer_class(data=request.data)
         serializer.is_valid(raise_exception=True)
 
         try:
             # We try to retrieve the move from  our database
             # before going the OMDB api endpoint
-            movie = Movie.objects.get(title__icontains=serializer['title'])
-        except:
+            title = serializer.validated_data['title']
+            movie = Movie.objects.get(title__icontains=title)
+        except Exception:
             pass
         else:
             if movie:
                 response_serializer = MovieSerializer(instance=movie)
-                return Response(response.data)
+                return Response(data=response_serializer.data)
 
-        params = {
+        query = urlencode({
             'apikey': 'b7e2e7b5',
             'r': 'json',
             't': serializer.validated_data['title'],
             'type': serializer.validated_data['movie_type']
-        }
-        query = urlencode(params)
+        })
         url = f'{self.api_url}?{query}'
+
         headers = {'content-type': 'application/json'}
         response = requests.get(url, headers=headers)
+
         if response.ok:
             data = response.json()
 
-            director = Director.objects.create(
-                firstname=None,
-                lastname=None
+            # Create the director
+            firstname, lastname = data['Director'].split(' ', maxsplit=1)
+            director, _ = Director.objects.get_or_create(
+                firstname=firstname,
+                lastname=lastname
             )
 
+            # Create the writers
+            # writers_objs = []
+            # writers = data['Writer'].split(',')
+            # for writer in writers:
+            #     firstname, lastname = writer.split(' ', maxsplit=1)
+            #     writer, _ = Writer.objects.get_or_create(
+            #         firstname=firstname,
+            #         lastname=lastname
+            #     )
+            #     writers_objs.append(writer)
+
+            # Create the actors, the director and the
+            writers_objs = utils.create_from_comma_separated(data['Writer'], Writer)
+            actors_objs = utils.create_from_comma_separated(data['Actors'], Actor)
+            # actors = data['Actors'].split(',')
+            # actors_objs = []
+            # for actor in actors:
+            #     firstname, lastname = actor.strip().split(' ', maxsplit=1)
+            #     actor, _ = Actor.objects.get_or_create(
+            #         firstname=firstname,
+            #         lastname=lastname
+            #     )
+            #     actors_objs.append(actor)
+
+            # Create the movie
             dvd_date = datetime.datetime.strptime(
                 data['DVD'],
-                '%d %L %Y'
+                '%d %b %Y'
             )
             release_date = datetime.datetime.strptime(
                 data['Released'],
-                '%d %L %Y'
+                '%d %b %Y'
             )
 
-            minutes = re.match(r'^\d+', data['Released'])
-            duration = datetime.timedelta(minutes=minutes)
+            minutes = 0
+            minutes_result = re.match(r'^\d+', data['Runtime'])
+            if minutes_result:
+                minutes = minutes_result.group(0)
+            duration = datetime.timedelta(minutes=int(minutes))
 
-            poster_response = requests.get(data['Poster'])
-            poster_file = File(poster_response.content, name='temp_poster.jpg')
+            imdb_votes = utils.parse_us_float(data['imdbVotes'])
+            box_office = utils.parse_currency(data['BoxOffice'])
 
-            writers = data['writer'].split(',')
-            writers_objs = []
-            for writer in writers:
-                writer = Writer.objects.create(
-                    firstname=None,
-                    lastname=None
-                )
-                writers_objs.append(writer)
+            # We are going to normalize the incoming
+            # rating dictionnary to something we can
+            # better control and understand:
+            # {source,  rating, scale, is_percentage}
+            ratings = data['Ratings']
+            normalized_ratings = []
+            for rating in ratings:
+                new_rating = {'is_percentage': False}
+                for key, value in rating.items():
+                    if key == 'Value':
+                        if '/' in value:
+                            lhv, scale = value.split('/')
+                            new_rating.update(
+                                rating=float(lhv),
+                                scale=scale
+                            )
 
-            actors = data['actors'].split(',')
-            actors_objs = []
-            for actor in actors:
-                actor = Actor.objects.create(
-                    firstname=None,
-                    lastname=None
-                )
-                actors_objs.append(actor)
+                        if '%' in value:
+                            result = re.match(r'\d+', value)
+                            if result:
+                                new_rating.update(
+                                    is_percentage=True,
+                                    rating=result.group(0),
+                                    scale=100
+                                )
+
+                    if key == 'Source':
+                        new_rating.update(source=value)
+                normalized_ratings.append(new_rating)
+            normalized_ratings = str(normalized_ratings)
 
             movie = Movie.objects.create(
                 title=data['Title'],
@@ -94,19 +145,26 @@ class SearchMovieView(APIView):
                 country=data['Country'],
                 awards=data['Awards'],
                 poster_url=data['Poster'],
-                poster_image=poster_file,
-                ratings=data['Ratings'],
+                ratings=normalized_ratings,
                 metascore=data['Metascore'],
                 imdb_rating=data['imdbRating'],
-                imdb_votes=data['imdbVotes'],
+                imdb_votes=imdb_votes,
                 imdb_id=data['imdbID'],
                 movie_type=data['Type'],
                 dvd=dvd_date,
-                box_office=data['BoxOffice'],
+                box_office=box_office,
                 website=data['Website']
             )
             movie.writers.add(*writers_objs)
             movie.actors.add(*actors_objs)
+
+            poster_response = requests.get(data['Poster'])
+            poster_file = ContentFile(
+                poster_response.content,
+                name='temp_poster.jpg'
+            )
+            movie.poster_image = poster_file
+            movie.save()
 
             response_serializer = MovieSerializer(instance=movie)
             return Response(response_serializer.data)

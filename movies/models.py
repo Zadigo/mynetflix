@@ -1,3 +1,4 @@
+from datetime import time
 import unidecode
 from django.db import models
 from django.db.models.signals import pre_save
@@ -22,13 +23,14 @@ class AbstractPerson(models.Model):
         blank=True,
         null=True
     )
-    lastname = models.CjharCharField(
+    lastname = models.CharField(
         max_length=200,
         blank=True,
         null=True
     )
 
     class Meta:
+        ordering = ['pk', 'lastname']
         constraints = [
             models.UniqueConstraint(
                 fields=['firstname', 'lastname'],
@@ -48,7 +50,13 @@ class AbstractPerson(models.Model):
 
 
 class Director(AbstractPerson):
-    pass
+    actor_id = None
+    director_id = models.CharField(
+        max_length=100,
+        unique=True,
+        blank=True,
+        null=True
+    )
 
 
 class Actor(AbstractPerson):
@@ -56,7 +64,12 @@ class Actor(AbstractPerson):
 
 
 class Writer(AbstractPerson):
-    pass
+    writer_id = models.CharField(
+        max_length=100,
+        unique=True,
+        blank=True,
+        null=True
+    )
 
 
 class Movie(models.Model):
@@ -72,17 +85,13 @@ class Movie(models.Model):
         blank=True,
         null=True
     )
-    # year = models.PositiveIntegerField(
-    #     blank=True,
-    #     null=True
-    # )
     rated = models.CharField(
         max_length=4,
         blank=True,
         null=True
     )
     release_date = models.DateField(
-        defualt=timezone.now,
+        default=timezone.now,
         help_text='The release date of the movie'
     )
     duration = models.DurationField(
@@ -94,7 +103,7 @@ class Movie(models.Model):
         blank=True,
         null=True
     )
-    director = models.ForeignKey(Director, models.CASCADE)
+    director = models.ForeignKey(Director, models.DO_NOTHING)
     writers = models.ManyToManyField(Writer, blank=True)
     actors = models.ManyToManyField(Actor, blank=True)
     plot = models.TextField(
@@ -120,17 +129,17 @@ class Movie(models.Model):
     poster_url = models.URLField(
         blank=True,
         null=True,
-        helpt_text='The initial poster image from Internet Movie Database'
+        help_text='The initial poster image from Internet Movie Database'
     )
     poster_image = models.ImageField(
         help_text='The downloaded poster image',
-        upload_to=None,
+        upload_to=utils.post_upload_helper,
         blank=True
     )
     small_poster = ImageSpecField(
         source='poster_image',
         processors=[ResizeToFill(210, 140)],
-        format='JPG',
+        format='JPEG',
         options={'quality': 100}
     )
     ratings = models.JSONField(
@@ -149,6 +158,7 @@ class Movie(models.Model):
     )
     imdb_votes = models.PositiveIntegerField(default=0)
     imdb_id = models.CharField(
+        max_length=100,
         blank=True,
         null=True,
         unique=True
@@ -177,12 +187,21 @@ class Movie(models.Model):
     modified_on = models.DateTimeField(auto_now=True)
     created_on = models.DateTimeField(auto_now_add=True)
 
+    class Meta:
+        ordering = ['created_on', 'title']
+
     def __str__(self):
         return f'Movie: {self.title}'
 
     @cached_property
-    def year(self):
+    def release_year(self):
+        """The year on which the movie as released"""
         return self.release_date.year
+
+    @cached_property
+    def release_span(self):
+        """Number of years since the movie was released"""
+        return timezone.now().year - self.release_year
 
 
 @receiver(pre_save, sender=Movie)
@@ -193,8 +212,8 @@ def create_movie_slug(instance, **kwargs):
 
 
 @receiver(pre_save, sender=Director)
-def create_movie_id(instance, **kwargs):
-    instance.movie_id = utils.create_id('dir')
+def create_director_id(instance, **kwargs):
+    instance.director_id = utils.create_id('dir')
 
 
 @receiver(pre_save, sender=Actor)
