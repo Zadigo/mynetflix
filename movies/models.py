@@ -1,14 +1,18 @@
+import pathlib
 from datetime import time
 import unidecode
 from django.db import models
-from django.db.models.signals import pre_save
+from django.db.models.signals import post_delete, pre_save
 from django.dispatch import receiver
 from django.utils import timezone
 from django.utils.functional import cached_property
 from imagekit.models import ImageSpecField
 from imagekit.processors import ResizeToFill
-
+import logging
 from movies import utils, validators
+
+
+model_logger = logging.getLogger(name='Models')
 
 
 class AbstractPerson(models.Model):
@@ -245,3 +249,21 @@ def create_writer_id(instance, **kwargs):
 @receiver(pre_save, sender=Movie)
 def create_movie_id(instance, **kwargs):
     instance.movie_id = utils.create_id('mv')
+
+
+@receiver(post_delete, sender=Movie)
+def remove_obselete_poster(instance, **kwargs):
+    try:
+        path = pathlib.Path(instance.poster_image.path)
+    except Exception as e:
+        print(e)
+        model_logger.error(f'Could not delete poster for {instance.movie_id}')
+    else:
+        if path.exists() and path.is_file():
+            parent = path.parent.absolute()
+            try:
+                path.unlink()
+                parent.rmdir()
+            except Exception as e:
+                print(e, 2)
+                model_logger.error(f'Could not delete poster for {instance.movie_id}')

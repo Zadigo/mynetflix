@@ -9,7 +9,7 @@ def create_id(prefix):
 def post_upload_helper(instance, name):
     new_name = get_random_string(length=20)
     _, extension = name.split('.')
-    return f'media/{instance.movie_id}/{new_name}.{extension}'
+    return f'posters/{instance.movie_id}/{new_name}.{extension}'
 
 
 def parse_us_float(value):
@@ -30,7 +30,7 @@ def create_from_comma_separated(data, model):
     separated value"""
     items = data.split(',')
     instance_objs = []
-    
+
     for item in items:
         firstname, lastname = item.strip().split(' ', maxsplit=1)
         instance, _ = model.objects.get_or_create(
